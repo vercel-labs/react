@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: Validate packages without publishing
+        description: Dry run (do not actually publish crates)
         type: boolean
         required: true
         default: false
