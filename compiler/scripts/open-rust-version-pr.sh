@@ -22,27 +22,33 @@ additions=$(jq -n \
     {path: "compiler/Cargo.toml", contents: $manifest},
     {path: "compiler/Cargo.lock", contents: $lockfile}
   ]')
-commit=$(gh api graphql \
-  --field query='mutation($input: CreateCommitOnBranchInput!) {
-    createCommitOnBranch(input: $input) {
-      commit { oid }
-    }
-  }' \
-  --field input="$(jq -n \
+graphql_input=$(jq -n \
+    --arg query 'mutation($input: CreateCommitOnBranchInput!) {
+      createCommitOnBranch(input: $input) {
+        commit { oid }
+      }
+    }' \
     --arg repository "$GITHUB_REPOSITORY" \
     --arg branch "$branch" \
     --arg headline "Update Rust compiler crates to $VERSION" \
     --arg expectedHeadOid "$BASE_SHA" \
     --argjson additions "$additions" \
     '{
-      branch: {
-        repositoryNameWithOwner: $repository,
-        branchName: $branch
-      },
-      message: {headline: $headline},
-      fileChanges: {additions: $additions},
-      expectedHeadOid: $expectedHeadOid
-    }')" \
+      query: $query,
+      variables: {
+        input: {
+          branch: {
+            repositoryNameWithOwner: $repository,
+            branchName: $branch
+          },
+          message: {headline: $headline},
+          fileChanges: {additions: $additions},
+          expectedHeadOid: $expectedHeadOid
+        }
+      }
+    }')
+commit=$(printf '%s' "$graphql_input" | gh api graphql \
+  --input - \
   --jq '.data.createCommitOnBranch.commit.oid')
 
 if [ "$(gh api "repos/$GITHUB_REPOSITORY/commits/$commit" --jq '.commit.verification.verified')" != "true" ]; then
